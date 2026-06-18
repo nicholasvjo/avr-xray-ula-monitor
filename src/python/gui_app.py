@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import queue
+import time
 import tkinter as tk
 from typing import Any
 
@@ -56,6 +57,8 @@ class AvrXrayApp(ctk.CTk):
         self.connection_state = "disconnected"
         self.latest_snapshot: SnapshotFrame | None = None
         self.latest_memory: MemoryFrame | None = None
+        self._last_ports_render_at = 0.0
+        self._ports_render_interval = 0.2
 
         self.port_var = tk.StringVar(value=initial_port or "Auto")
         self.baud_var = tk.StringVar(value=str(baud))
@@ -653,11 +656,7 @@ class AvrXrayApp(ctk.CTk):
                 text_color="#031014" if active else MUTED,
             )
 
-        for port_name, state in frame.ports.items():
-            widgets = self.port_widgets[port_name]
-            widgets["ddr"].set_value(state.ddr)
-            widgets["port"].set_value(state.port)
-            widgets["pin"].set_value(state.pin)
+        self._render_ports(frame)
 
         for key, metric in self.timer_metrics.items():
             value = getattr(frame.timers, key)
@@ -669,6 +668,23 @@ class AvrXrayApp(ctk.CTk):
         self.adc_bar.set(frame.adc.a0 / 1023)
         self.heatmap.update_bytes(frame.sram)
         self._inspect_sram(self.heatmap.selected_index, frame.sram[self.heatmap.selected_index])
+
+    def _render_ports(self, frame: SnapshotFrame) -> None:
+        if self.tabview.get() != "Portas":
+            return
+
+        now = time.monotonic()
+        if now - self._last_ports_render_at < self._ports_render_interval:
+            return
+        self._last_ports_render_at = now
+
+        for port_name, state in frame.ports.items():
+            widgets = self.port_widgets.get(port_name)
+            if widgets is None:
+                continue
+            widgets["ddr"].set_value(state.ddr)
+            widgets["port"].set_value(state.port)
+            widgets["pin"].set_value(state.pin)
 
     def _render_memory(self, frame: MemoryFrame) -> None:
         self._set_text(self.eeprom_text, self._hex_dump(frame.eeprom))

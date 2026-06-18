@@ -84,13 +84,12 @@ class SerialWorker:
         serial_connection = self._serial
         if serial_connection is not None:
             try:
-                serial_connection.close()
-            except serial.SerialException:
+                serial_connection.cancel_read()
+            except (AttributeError, OSError, serial.SerialException):
                 pass
         if self._thread is not None and self._thread.is_alive():
             self._thread.join(timeout=1.5)
         self._thread = None
-        self._serial = None
 
     def request_static(self) -> None:
         self.send(encode_get_static())

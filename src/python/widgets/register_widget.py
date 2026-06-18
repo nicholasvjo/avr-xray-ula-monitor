@@ -54,7 +54,7 @@ class ByteRegisterWidget(ctk.CTkFrame):
             corner_radius=7,
         )
         self.grid_columnconfigure(1, weight=1)
-        self._value = 0
+        self._value: int | None = None
 
         self.name_label = ctk.CTkLabel(
             self,
@@ -105,12 +105,22 @@ class ByteRegisterWidget(ctk.CTkFrame):
         self.value_label.grid(row=0, column=2, rowspan=2, padx=(2, 10), pady=8)
 
     def set_value(self, value: int) -> None:
-        self._value = value & 0xFF
+        new_value = value & 0xFF
+        if new_value == self._value:
+            return
+
+        previous_value = self._value
+        self._value = new_value
+
         for label, bit in zip(self.bit_labels, range(7, -1, -1)):
-            active = bool(self._value & (1 << bit))
+            mask = 1 << bit
+            if previous_value is not None and not ((previous_value ^ new_value) & mask):
+                continue
+
+            active = bool(new_value & mask)
             label.configure(
                 text="1" if active else "0",
                 fg_color=CYAN if active else OFF,
                 text_color="#031014" if active else MUTED,
             )
-        self.value_label.configure(text=f"0x{self._value:02X}\n{self._value:03d}")
+        self.value_label.configure(text=f"0x{new_value:02X}\n{new_value:03d}")
