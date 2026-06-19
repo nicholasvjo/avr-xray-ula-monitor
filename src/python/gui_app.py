@@ -3,6 +3,7 @@ from __future__ import annotations
 import queue
 import time
 import tkinter as tk
+from pathlib import Path
 from typing import Any
 
 import customtkinter as ctk
@@ -89,7 +90,7 @@ class AvrXrayApp(ctk.CTk):
             value="Aguardando a leitura da EEPROM."
         )
 
-        self.title("AVR X-Ray - Monitor Interno do ATmega328P")
+        self.title("Sistemas Digitais 2026.1")
         self.geometry("1380x900")
         self.minsize(1160, 760)
         self.configure(fg_color=BG)
@@ -175,18 +176,47 @@ class AvrXrayApp(ctk.CTk):
         header.grid(row=0, column=0, sticky="ew", padx=22, pady=(16, 10))
         header.grid_columnconfigure(0, weight=1)
 
+        brand = ctk.CTkFrame(header, fg_color=BG, corner_radius=0)
+        brand.grid(row=0, column=0, rowspan=2, sticky="w")
+        brand.grid_columnconfigure(1, weight=1)
+
+        logo_path = Path(__file__).resolve().parents[2] / "assets" / "ufrj.png"
+        try:
+            self.ufrj_logo = tk.PhotoImage(file=str(logo_path)).subsample(5, 5)
+            tk.Label(
+                brand,
+                image=self.ufrj_logo,
+                width=64,
+                height=76,
+                bg=BG,
+                borderwidth=0,
+                highlightthickness=0,
+            ).grid(row=0, column=0, rowspan=2, sticky="w", padx=(0, 13))
+        except tk.TclError:
+            self.ufrj_logo = None
+            ctk.CTkLabel(
+                brand,
+                text="UFRJ",
+                width=64,
+                height=64,
+                corner_radius=6,
+                fg_color=SURFACE,
+                text_color=TEXT,
+                font=ctk.CTkFont(size=17, weight="bold"),
+            ).grid(row=0, column=0, rowspan=2, sticky="w", padx=(0, 13))
+
         ctk.CTkLabel(
-            header,
-            text="AVR X-Ray",
+            brand,
+            text="Sistemas Digitais 2026.1",
             text_color=TEXT,
-            font=ctk.CTkFont(size=29, weight="bold"),
-        ).grid(row=0, column=0, sticky="w")
+            font=ctk.CTkFont(size=27, weight="bold"),
+        ).grid(row=0, column=1, sticky="sw")
         ctk.CTkLabel(
-            header,
+            brand,
             textvariable=self.device_var,
             text_color=MUTED,
             font=ctk.CTkFont(size=13),
-        ).grid(row=1, column=0, sticky="w", pady=(1, 0))
+        ).grid(row=1, column=1, sticky="nw", pady=(2, 0))
 
         controls = ctk.CTkFrame(header, fg_color=BG, corner_radius=0)
         controls.grid(row=0, column=1, rowspan=2, sticky="e")
