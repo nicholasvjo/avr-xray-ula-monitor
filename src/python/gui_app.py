@@ -15,7 +15,6 @@ from protocol import (
     FLAG_NEGATIVE,
     FLAG_OVERFLOW,
     FLAG_ZERO,
-    HelloFrame,
     MemoryFrame,
     OPERATION_REFERENCE,
     SRAM_SIZE,
@@ -69,10 +68,8 @@ class AvrXrayApp(ctk.CTk):
         self._highlighted_operation: int | None = None
 
         self.port_var = tk.StringVar(value=initial_port or "Automática")
-        self.baud_var = tk.StringVar(value=str(baud))
         self.simulate_var = tk.BooleanVar(value=simulate)
         self.status_var = tk.StringVar(value="Desconectado")
-        self.device_var = tk.StringVar(value="Aguardando dispositivo")
         self.sequence_var = tk.StringVar(value="amostra --")
         self.uptime_var = tk.StringVar(value="tempo --")
         self.inspector_title_var = tk.StringVar(
@@ -99,6 +96,7 @@ class AvrXrayApp(ctk.CTk):
         self.ula_metrics: dict[str, MetricWidget] = {}
         self.ula_flags: dict[str, ctk.CTkLabel] = {}
         self.sreg_flags: dict[str, ctk.CTkLabel] = {}
+        self.sreg_detail_flags: dict[str, ctk.CTkLabel] = {}
         self.port_widgets: dict[str, dict[str, ByteRegisterWidget]] = {}
         self.timer_metrics: dict[str, MetricWidget] = {}
         self.operation_reference_rows: dict[int, list[ctk.CTkLabel]] = {}
@@ -132,12 +130,14 @@ class AvrXrayApp(ctk.CTk):
         self.tabview.grid(row=1, column=0, sticky="nsew", padx=18, pady=(0, 10))
 
         self.overview_tab = self.tabview.add("Visão Geral")
+        self.sreg_tab = self.tabview.add("SREG")
         self.ports_tab = self.tabview.add("Portas")
         self.timers_tab = self.tabview.add("Temporizadores")
         self.memory_tab = self.tabview.add("Memória")
 
         for tab in (
             self.overview_tab,
+            self.sreg_tab,
             self.ports_tab,
             self.timers_tab,
             self.memory_tab,
@@ -145,6 +145,7 @@ class AvrXrayApp(ctk.CTk):
             tab.configure(fg_color=BG)
 
         self._build_overview_tab()
+        self._build_sreg_tab()
         self._build_ports_tab()
         self._build_timers_tab()
         self._build_memory_tab()
@@ -213,7 +214,7 @@ class AvrXrayApp(ctk.CTk):
         ).grid(row=0, column=1, sticky="sw")
         ctk.CTkLabel(
             brand,
-            textvariable=self.device_var,
+            text="Análise de memória do Arduino UNO",
             text_color=MUTED,
             font=ctk.CTkFont(size=13),
         ).grid(row=1, column=1, sticky="nw", pady=(2, 0))
@@ -245,17 +246,6 @@ class AvrXrayApp(ctk.CTk):
             hover_color="#314A54",
         ).grid(row=0, column=1, padx=4)
 
-        self.baud_entry = ctk.CTkEntry(
-            controls,
-            textvariable=self.baud_var,
-            width=90,
-            height=36,
-            fg_color=SURFACE,
-            border_color=BORDER,
-            justify="center",
-        )
-        self.baud_entry.grid(row=0, column=2, padx=4)
-
         self.simulate_switch = ctk.CTkSwitch(
             controls,
             text="Simular",
@@ -265,7 +255,7 @@ class AvrXrayApp(ctk.CTk):
             progress_color=BLUE,
             button_color=TEXT,
         )
-        self.simulate_switch.grid(row=0, column=3, padx=(8, 6))
+        self.simulate_switch.grid(row=0, column=2, padx=(8, 6))
 
         self.connect_button = ctk.CTkButton(
             controls,
@@ -278,7 +268,7 @@ class AvrXrayApp(ctk.CTk):
             text_color="#04120A",
             font=ctk.CTkFont(size=13, weight="bold"),
         )
-        self.connect_button.grid(row=0, column=4, padx=4)
+        self.connect_button.grid(row=0, column=3, padx=4)
 
         self.status_badge = ctk.CTkLabel(
             controls,
@@ -290,7 +280,7 @@ class AvrXrayApp(ctk.CTk):
             text_color=MUTED,
             font=ctk.CTkFont(size=11, weight="bold"),
         )
-        self.status_badge.grid(row=0, column=5, padx=(8, 0))
+        self.status_badge.grid(row=0, column=4, padx=(8, 0))
 
     def _build_overview_tab(self) -> None:
         tab = self.overview_tab
@@ -718,6 +708,213 @@ class AvrXrayApp(ctk.CTk):
                 row_widgets[key] = label
             self.history_rows.append(row_widgets)
 
+    def _build_sreg_tab(self) -> None:
+        tab = self.sreg_tab
+        tab.grid_columnconfigure(0, weight=1)
+        tab.grid_rowconfigure(0, weight=1)
+
+        scroll = ctk.CTkScrollableFrame(
+            tab,
+            fg_color=BG,
+            corner_radius=0,
+            scrollbar_button_color="#29505A",
+            scrollbar_button_hover_color=CYAN,
+        )
+        scroll.grid(row=0, column=0, sticky="nsew", padx=6, pady=6)
+        scroll.grid_columnconfigure(0, weight=1)
+
+        introduction = ctk.CTkFrame(
+            scroll,
+            fg_color=SURFACE,
+            border_color=BORDER,
+            border_width=1,
+        )
+        introduction.grid(row=0, column=0, sticky="ew", padx=6, pady=(6, 10))
+        introduction.grid_columnconfigure(0, weight=3)
+        introduction.grid_columnconfigure(1, weight=2)
+
+        text_panel = ctk.CTkFrame(
+            introduction,
+            fg_color="transparent",
+            corner_radius=0,
+        )
+        text_panel.grid(row=0, column=0, sticky="nsew", padx=18, pady=16)
+        text_panel.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(
+            text_panel,
+            text="Registrador de estado SREG",
+            text_color=TEXT,
+            font=ctk.CTkFont(size=22, weight="bold"),
+        ).grid(row=0, column=0, sticky="w")
+        ctk.CTkLabel(
+            text_panel,
+            text=(
+                "SREG significa Status Register. É o registrador de estado de "
+                "8 bits da CPU AVR presente no Arduino UNO. As instruções do "
+                "processador atualizam essas flags para descrever o resultado "
+                "de operações aritméticas, lógicas e de controle."
+            ),
+            text_color=MUTED,
+            justify="left",
+            anchor="w",
+            wraplength=660,
+            font=ctk.CTkFont(size=13),
+        ).grid(row=1, column=0, sticky="ew", pady=(7, 0))
+        ctk.CTkLabel(
+            text_panel,
+            text=(
+                "O painel é somente leitura: ele observa o valor enviado pelo "
+                "Arduino e não altera o SREG."
+            ),
+            text_color=CYAN,
+            justify="left",
+            anchor="w",
+            wraplength=660,
+            font=ctk.CTkFont(size=12, weight="bold"),
+        ).grid(row=2, column=0, sticky="ew", pady=(10, 0))
+
+        register_panel = ctk.CTkFrame(
+            introduction,
+            fg_color=SURFACE_ALT,
+            border_color=BORDER,
+            border_width=1,
+        )
+        register_panel.grid(
+            row=0,
+            column=1,
+            sticky="nsew",
+            padx=(0, 16),
+            pady=16,
+        )
+        register_panel.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(
+            register_panel,
+            text="Valor atual",
+            text_color=TEXT,
+            font=ctk.CTkFont(size=15, weight="bold"),
+        ).grid(row=0, column=0, sticky="w", padx=14, pady=(12, 7))
+        self.sreg_detail_register = ByteRegisterWidget(register_panel, "SREG")
+        self.sreg_detail_register.grid(
+            row=1,
+            column=0,
+            sticky="ew",
+            padx=12,
+            pady=(0, 12),
+        )
+
+        flags_panel = ctk.CTkFrame(scroll, fg_color=BG, corner_radius=0)
+        flags_panel.grid(row=1, column=0, sticky="ew", padx=6, pady=(0, 12))
+        flags_panel.grid_columnconfigure((0, 1), weight=1, uniform="sreg_flags")
+
+        flag_descriptions = (
+            (
+                "I",
+                7,
+                "Interrupção global",
+                "Permite interrupções mascaráveis quando está em 1.",
+            ),
+            (
+                "T",
+                6,
+                "Bit temporário",
+                "Armazena temporariamente um bit pelas instruções BLD e BST.",
+            ),
+            (
+                "H",
+                5,
+                "Meio transporte",
+                "Indica transporte entre os bits 3 e 4 em operações aritméticas.",
+            ),
+            (
+                "S",
+                4,
+                "Sinal",
+                "Combina negativo e overflow: S = N XOR V.",
+            ),
+            (
+                "V",
+                3,
+                "Overflow",
+                "Indica estouro em uma operação aritmética com sinal.",
+            ),
+            (
+                "N",
+                2,
+                "Negativo",
+                "Reflete o bit mais significativo do resultado da operação.",
+            ),
+            (
+                "Z",
+                1,
+                "Zero",
+                "Fica ativa quando o resultado da operação é igual a zero.",
+            ),
+            (
+                "C",
+                0,
+                "Transporte",
+                "Indica carry, borrow ou bit deslocado, conforme a instrução.",
+            ),
+        )
+
+        for index, (flag, bit, title, description) in enumerate(flag_descriptions):
+            item = ctk.CTkFrame(
+                flags_panel,
+                fg_color=SURFACE,
+                border_color=BORDER,
+                border_width=1,
+                corner_radius=6,
+            )
+            item.grid(
+                row=index // 2,
+                column=index % 2,
+                sticky="nsew",
+                padx=(0, 5) if index % 2 == 0 else (5, 0),
+                pady=5,
+            )
+            item.grid_columnconfigure(1, weight=1)
+
+            ctk.CTkLabel(
+                item,
+                text=flag,
+                width=54,
+                height=54,
+                corner_radius=6,
+                fg_color=OFF,
+                text_color=CYAN,
+                font=ctk.CTkFont(size=22, weight="bold"),
+            ).grid(row=0, column=0, rowspan=2, padx=12, pady=12)
+
+            ctk.CTkLabel(
+                item,
+                text=f"Bit {bit} · {title}",
+                text_color=TEXT,
+                anchor="w",
+                font=ctk.CTkFont(size=14, weight="bold"),
+            ).grid(row=0, column=1, sticky="ew", pady=(12, 2))
+            ctk.CTkLabel(
+                item,
+                text=description,
+                text_color=MUTED,
+                justify="left",
+                anchor="nw",
+                wraplength=420,
+                font=ctk.CTkFont(size=12),
+            ).grid(row=1, column=1, sticky="nsew", pady=(0, 12))
+
+            status = ctk.CTkLabel(
+                item,
+                text="INATIVA\n0",
+                width=76,
+                height=48,
+                corner_radius=6,
+                fg_color=OFF,
+                text_color=MUTED,
+                font=ctk.CTkFont(size=11, weight="bold"),
+            )
+            status.grid(row=0, column=2, rowspan=2, padx=12, pady=12)
+            self.sreg_detail_flags[flag] = status
+
     def _build_ports_tab(self) -> None:
         tab = self.ports_tab
         tab.grid_columnconfigure((0, 1, 2), weight=1, uniform="ports")
@@ -970,13 +1167,7 @@ class AvrXrayApp(ctk.CTk):
 
     def _connect(self) -> None:
         self._disconnect_source()
-        try:
-            baud = int(self.baud_var.get().strip())
-            if baud <= 0:
-                raise ValueError
-        except ValueError:
-            self._set_status("Taxa de transmissão inválida.", "error")
-            return
+        baud = self.default_baud
 
         if self.simulate_var.get():
             self.source = SimulatorWorker(self.events)
@@ -997,7 +1188,6 @@ class AvrXrayApp(ctk.CTk):
         self._disconnect_source()
         self.connection_state = "disconnected"
         self._set_status("Desconectado.", "offline")
-        self.device_var.set("Aguardando dispositivo")
         self._refresh_connection_controls()
 
     def _disconnect_source(self) -> None:
@@ -1058,12 +1248,7 @@ class AvrXrayApp(ctk.CTk):
 
         if event.kind == "frame":
             frame = event.data
-            if isinstance(frame, HelloFrame):
-                self.device_var.set(
-                    f"{frame.device} | Firmware {frame.firmware} | "
-                    f"{frame.sample_hz} amostras/s"
-                )
-            elif isinstance(frame, SnapshotFrame):
+            if isinstance(frame, SnapshotFrame):
                 self.latest_snapshot = frame
                 self._render_snapshot(frame)
             elif isinstance(frame, MemoryFrame):
@@ -1105,17 +1290,7 @@ class AvrXrayApp(ctk.CTk):
                 text_color="#031014" if active else MUTED,
             )
 
-        self.sreg_register.set_value(frame.sreg)
-        for name, bit in zip(
-            ("I", "T", "H", "S", "V", "N", "Z", "C"),
-            range(7, -1, -1),
-        ):
-            active = bool(frame.sreg & (1 << bit))
-            self.sreg_flags[name].configure(
-                text=f"{name}\n{int(active)}",
-                fg_color=CYAN if active else OFF,
-                text_color="#031014" if active else MUTED,
-            )
+        self._render_sreg(frame.sreg)
 
         self._render_ports(frame)
 
@@ -1129,6 +1304,25 @@ class AvrXrayApp(ctk.CTk):
         self.adc_voltage.set(f"{voltage_text} V")
         self.adc_bar.set(frame.adc.a0 / 1023)
         self._render_memory_heatmap(frame)
+
+    def _render_sreg(self, value: int) -> None:
+        self.sreg_register.set_value(value)
+        self.sreg_detail_register.set_value(value)
+        for name, bit in zip(
+            ("I", "T", "H", "S", "V", "N", "Z", "C"),
+            range(7, -1, -1),
+        ):
+            active = bool(value & (1 << bit))
+            self.sreg_flags[name].configure(
+                text=f"{name}\n{int(active)}",
+                fg_color=CYAN if active else OFF,
+                text_color="#031014" if active else MUTED,
+            )
+            self.sreg_detail_flags[name].configure(
+                text=f"{'ATIVA' if active else 'INATIVA'}\n{int(active)}",
+                fg_color=CYAN if active else OFF,
+                text_color="#031014" if active else MUTED,
+            )
 
     def _render_ports(self, frame: SnapshotFrame) -> None:
         if self.tabview.get() != "Portas":
