@@ -7,17 +7,20 @@ from collections.abc import Callable
 import customtkinter as ctk
 
 
-BG = "#09171B"
-BORDER = "#21434B"
-MUTED = "#83A0A8"
+BG = "#06131A"
+BORDER = "#285965"
+MUTED = "#8CB4BE"
 AMBER = "#FFB84D"
+SELECTED = "#F5F7FA"
 
 
 class MemoryHeatmap(ctk.CTkFrame):
     COLUMNS = 16
     ROWS = 8
-    CELL_WIDTH = 34
-    CELL_HEIGHT = 31
+    CELL_WIDTH = 39
+    CELL_HEIGHT = 36
+    HEADER_LEFT = 38
+    HEADER_TOP = 27
 
     def __init__(
         self,
@@ -36,8 +39,8 @@ class MemoryHeatmap(ctk.CTkFrame):
         self.changed_at = [0.0] * 128
         self.selected_index = 0
 
-        width = self.COLUMNS * self.CELL_WIDTH
-        height = self.ROWS * self.CELL_HEIGHT
+        width = self.HEADER_LEFT + self.COLUMNS * self.CELL_WIDTH
+        height = self.HEADER_TOP + self.ROWS * self.CELL_HEIGHT
         self.canvas = tk.Canvas(
             self,
             width=width,
@@ -62,8 +65,17 @@ class MemoryHeatmap(ctk.CTkFrame):
         self._render_cells()
 
     def _handle_click(self, event: tk.Event) -> None:
-        column = min(self.COLUMNS - 1, max(0, event.x // self.CELL_WIDTH))
-        row = min(self.ROWS - 1, max(0, event.y // self.CELL_HEIGHT))
+        if event.x < self.HEADER_LEFT or event.y < self.HEADER_TOP:
+            return
+
+        column = min(
+            self.COLUMNS - 1,
+            max(0, (event.x - self.HEADER_LEFT) // self.CELL_WIDTH),
+        )
+        row = min(
+            self.ROWS - 1,
+            max(0, (event.y - self.HEADER_TOP) // self.CELL_HEIGHT),
+        )
         index = row * self.COLUMNS + column
         self.selected_index = index
         self._render_cells()
@@ -77,19 +89,19 @@ class MemoryHeatmap(ctk.CTkFrame):
         for index, value in enumerate(self.data):
             column = index % self.COLUMNS
             row = index // self.COLUMNS
-            x1 = column * self.CELL_WIDTH + 2
-            y1 = row * self.CELL_HEIGHT + 2
-            x2 = x1 + self.CELL_WIDTH - 4
-            y2 = y1 + self.CELL_HEIGHT - 4
+            x1 = self.HEADER_LEFT + column * self.CELL_WIDTH + 3
+            y1 = self.HEADER_TOP + row * self.CELL_HEIGHT + 3
+            x2 = x1 + self.CELL_WIDTH - 6
+            y2 = y1 + self.CELL_HEIGHT - 6
 
-            outline = "#35545D"
+            outline = "#2F5964"
             width = 1
             if now - self.changed_at[index] < 0.55:
                 outline = AMBER
-                width = 2
+                width = 3
             if index == self.selected_index:
-                outline = "#EAF2F5"
-                width = 2
+                outline = SELECTED
+                width = 3
 
             self.canvas.create_rectangle(
                 x1,
@@ -104,30 +116,39 @@ class MemoryHeatmap(ctk.CTkFrame):
                 (x1 + x2) / 2,
                 (y1 + y2) / 2,
                 text=f"{value:02X}",
-                fill="#EAF2F5" if value < 175 else "#041014",
-                font=("Consolas", 9, "bold"),
+                fill="#F5F7FA" if value < 166 else "#031014",
+                font=("Consolas", 10, "bold"),
             )
 
         for column in range(self.COLUMNS):
             self.canvas.create_text(
-                column * self.CELL_WIDTH + self.CELL_WIDTH / 2,
-                7,
+                self.HEADER_LEFT + column * self.CELL_WIDTH + self.CELL_WIDTH / 2,
+                self.HEADER_TOP / 2,
                 text=f"{column:X}",
                 fill=MUTED,
-                font=("Consolas", 7),
+                font=("Consolas", 10, "bold"),
+            )
+
+        for row in range(self.ROWS):
+            self.canvas.create_text(
+                self.HEADER_LEFT / 2,
+                self.HEADER_TOP + row * self.CELL_HEIGHT + self.CELL_HEIGHT / 2,
+                text=f"{row * self.COLUMNS:02X}",
+                fill=MUTED,
+                font=("Consolas", 9, "bold"),
             )
 
     @staticmethod
     def _value_color(value: int) -> str:
         ratio = value / 255
-        low = (14, 31, 37)
-        mid = (19, 92, 102)
-        high = (0, 217, 255)
-        if ratio < 0.55:
-            local = ratio / 0.55
+        low = (12, 30, 55)
+        mid = (0, 119, 145)
+        high = (62, 245, 190)
+        if ratio < 0.52:
+            local = ratio / 0.52
             start, end = low, mid
         else:
-            local = (ratio - 0.55) / 0.45
+            local = (ratio - 0.52) / 0.48
             start, end = mid, high
         red = round(start[0] + (end[0] - start[0]) * local)
         green = round(start[1] + (end[1] - start[1]) * local)

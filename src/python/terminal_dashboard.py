@@ -86,18 +86,18 @@ def _render_terminal(
     )
 
     lines = [
-        "AVR X-Ray - ATmega328P Internal Monitor",
+        "AVR X-Ray - Monitor Interno do ATmega328P",
         "=" * 72,
         device,
         status,
-        f"seq={frame.sequence} uptime={frame.millis / 1000:.1f}s",
+        f"amostra={frame.sequence} tempo={frame.millis / 1000:.1f}s",
         "",
         (
             f"ULA  A={ula.a:02d}/{ula.a:04b}  B={ula.b:02d}/{ula.b:04b}  "
-            f"OP={ula.operation}:{ula.operation_name}  "
+            f"OPERAÇÃO={ula.operation}:{ula.operation_name}  "
             f"R={ula.result:02d}/{ula.result:04b}"
         ),
-        f"     stage={ula.stage_name} input={ula.input_value:04b}  {flag_values}",
+        f"     etapa={ula.stage_name} entrada={ula.input_value:04b}  {flag_values}",
         f"SREG 0x{frame.sreg:02X} / {frame.sreg:08b}",
         "",
     ]
@@ -112,7 +112,7 @@ def _render_terminal(
         (
             "",
             (
-                f"Timers TCNT0={timers.tcnt0:3d} "
+                f"Temporizadores TCNT0={timers.tcnt0:3d} "
                 f"TCNT1={timers.tcnt1:5d} TCNT2={timers.tcnt2:3d}"
             ),
             (
@@ -122,7 +122,7 @@ def _render_terminal(
             ),
             f"ADC A0={frame.adc.a0:4d}/1023  {frame.adc.volts:.3f} V",
             "",
-            "SRAM[0:32]",
+            "SRAM monitorada [0:32]",
             _short_hex(frame.sram[:32]),
         )
     )
@@ -132,12 +132,12 @@ def _render_terminal(
         lines.extend(
             (
                 "",
-                f"EEPROM={len(memory.eeprom)} bytes, history={history_count} records",
+                f"EEPROM={len(memory.eeprom)} bytes, histórico={history_count} registros",
                 f"FLASH={len(memory.flash)} bytes: {_short_hex(memory.flash[:16])}",
             )
         )
     else:
-        lines.append("\nEEPROM/FLASH: aguardando GET_STATIC")
+        lines.append("\nEEPROM/FLASH: aguardando atualização das memórias")
 
     lines.append("\nCtrl+C para sair.")
     return "\n".join(lines)

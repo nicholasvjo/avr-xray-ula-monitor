@@ -19,9 +19,9 @@ class UlaResult:
 
 def execute_ula(a: int, b: int, operation: int) -> UlaResult:
     if not 0 <= a <= 15 or not 0 <= b <= 15:
-        raise ValueError("A and B must be 4-bit values.")
+        raise ValueError("A e B devem ser valores de 4 bits.")
     if not 0 <= operation <= 7:
-        raise ValueError("Operation must be between 0 and 7.")
+        raise ValueError("A operação deve estar entre 0 e 7.")
 
     result = 0
     carry = False

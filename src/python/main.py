@@ -8,16 +8,21 @@ def build_parser() -> argparse.ArgumentParser:
         description="AVR X-Ray - monitor interno do ATmega328P."
     )
     parser.add_argument("--port", help="Porta serial, por exemplo COM3 ou /dev/ttyACM0.")
-    parser.add_argument("--baud", type=int, default=115200, help="Baud rate da Serial.")
+    parser.add_argument(
+        "--baud",
+        type=int,
+        default=115200,
+        help="Taxa de transmissão da porta serial.",
+    )
     parser.add_argument(
         "--simulate",
         action="store_true",
-        help="Usa dados simulados e nao requer Arduino.",
+        help="Usa dados simulados e não requer Arduino.",
     )
     parser.add_argument(
         "--terminal",
         action="store_true",
-        help="Exibe os snapshots no terminal em vez da interface grafica.",
+        help="Exibe as amostras no terminal em vez da interface gráfica.",
     )
     return parser
 

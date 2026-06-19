@@ -148,10 +148,10 @@ python main.py --terminal --simulate
 
 The GUI contains four working views:
 
-- **Visao Geral:** ALU operands, operation, result, flags, SREG and ADC A0.
+- **Visao Geral:** ALU state, operation reference, flag legend, SREG, ADC A0, and the recent EEPROM operation table.
 - **Portas:** DDRB/C/D, PORTB/C/D and PINB/C/D with bit-level displays.
 - **Timers:** TCNT0/1/2 and TCCR0/1/2 A/B.
-- **Memoria:** live SRAM heatmap, EEPROM dump/history and FLASH dump.
+- **Memoria:** enlarged live SRAM heatmap, detailed address inspector, EEPROM dump, and FLASH dump.
 
 Timer registers are read only. The sketch does not reconfigure Timer0, Timer1, or Timer2. This is especially important because the Arduino core uses Timer0 for `millis()`, `delay()`, and internal timing.
 
@@ -168,6 +168,9 @@ The heatmap is a `16 x 8` grid. Every cell is one byte:
 - brighter cells have larger values;
 - changed bytes receive a temporary amber outline;
 - clicking a cell shows its index, decimal, hexadecimal, binary, and known meaning.
+
+The ATmega328P has 2,048 bytes of SRAM. The instrumented `ula_probe`
+window shows 128 bytes, or 6.25% of the total SRAM.
 
 Offsets `0..15` contain current ALU, CPU, port, timer, and ADC data. Offsets `16..127` contain a 16-entry circular ALU history.
 
@@ -281,15 +284,18 @@ O arquivo [docs/hardware_map.md](docs/hardware_map.md) documenta as evidencias d
 
 O fluxo da ULA e `A -> B -> operacao -> resultado`. A EEPROM recebe um registro somente quando a operacao e confirmada com OK.
 
-O dashboard mostra:
+O painel mostra:
 
 - ULA e flags `Z`, `C`, `N`, `V`, `D`;
+- tabela de referencia das operacoes e legenda das flags;
+- historico recente da EEPROM em formato tabular na Visao Geral;
 - DDR, PORT e PIN dos grupos B, C e D;
 - SREG;
 - TCNT0/1/2 e TCCR0/1/2 A/B;
 - ADC A0 e tensao aproximada;
-- heatmap vivo de `ula_probe[128]`;
-- EEPROM e historico persistente;
+- mapa de calor ampliado de `ula_probe[128]`;
+- inspetor detalhado dos enderecos monitorados;
+- dump da EEPROM;
 - janela de FLASH.
 
 O firmware apenas le os registradores dos timers. Ele nao altera suas configuracoes.
@@ -300,7 +306,10 @@ O Arduino gera JSON Lines manualmente com `Serial.print()`, sem ArduinoJson. Sna
 
 O comando `GET_STATIC` reenvia EEPROM e FLASH. O Python envia esse comando ao conectar e pelo botao da interface.
 
-O heatmap representa 128 bytes reais de SRAM em uma grade `16 x 8`. Bytes alterados sao destacados, e o clique mostra valor e significado.
+O ATmega328P possui 2.048 bytes de SRAM. O mapa de calor representa uma
+janela instrumentada de 128 bytes, equivalente a 6,25% da SRAM total, em uma
+grade `16 x 8`. Bytes alterados sao destacados, e o clique mostra valor,
+significado e uma explicacao didatica do endereco.
 
 ### Testes
 

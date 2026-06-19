@@ -7,6 +7,7 @@ from typing import Any
 
 PROTOCOL_VERSION = 1
 SRAM_SIZE = 128
+ATMEGA328P_SRAM_SIZE = 2048
 EEPROM_SIZE = 192
 FLASH_SIZE = 64
 
@@ -17,21 +18,32 @@ FLAG_OVERFLOW = 1 << 3
 FLAG_DIV_ZERO = 1 << 4
 
 OPERATION_NAMES = {
-    0: "AND",
-    1: "OR",
-    2: "NOT(B)",
-    3: "XOR",
-    4: "ADD",
-    5: "SUB",
-    6: "MUL",
-    7: "DIV",
+    0: "E lógico",
+    1: "OU lógico",
+    2: "NÃO de B",
+    3: "OU exclusivo",
+    4: "Soma",
+    5: "Subtração",
+    6: "Multiplicação",
+    7: "Divisão",
 }
 
+OPERATION_REFERENCE = (
+    (0, "000", "E lógico", "A & B", "Mantém em 1 apenas os bits ligados em A e B."),
+    (1, "001", "OU lógico", "A | B", "Liga os bits presentes em A ou em B."),
+    (2, "010", "NÃO de B", "~B", "Inverte os quatro bits do operando B."),
+    (3, "011", "OU exclusivo", "A ^ B", "Liga os bits diferentes entre A e B."),
+    (4, "100", "Soma", "A + B", "Soma A e B; C indica o vai-um."),
+    (5, "101", "Subtração", "A - B", "Subtração modular; C indica empréstimo."),
+    (6, "110", "Multiplicação", "A × B", "Mantém quatro bits; V indica estouro."),
+    (7, "111", "Divisão", "A ÷ B", "Divisão inteira; D indica divisor igual a zero."),
+)
+
 STAGE_NAMES = {
-    0: "INPUT_A",
-    1: "INPUT_B",
-    2: "INPUT_OPERATION",
-    3: "RESULT",
+    0: "Entrada do operando A",
+    1: "Entrada do operando B",
+    2: "Seleção da operação",
+    3: "Resultado",
 }
 
 
@@ -59,11 +71,11 @@ class UlaState:
 
     @property
     def operation_name(self) -> str:
-        return OPERATION_NAMES.get(self.operation, f"OP {self.operation}")
+        return OPERATION_NAMES.get(self.operation, f"Operação {self.operation}")
 
     @property
     def stage_name(self) -> str:
-        return STAGE_NAMES.get(self.stage, f"STAGE {self.stage}")
+        return STAGE_NAMES.get(self.stage, f"Etapa {self.stage}")
 
     def flag(self, mask: int) -> bool:
         return bool(self.flags & mask)
@@ -125,12 +137,12 @@ def decode_line(line: str | bytes) -> ProtocolFrame:
         try:
             line = line.decode("ascii")
         except UnicodeDecodeError as exc:
-            raise ProtocolError("A mensagem nao e ASCII.") from exc
+            raise ProtocolError("A mensagem não está em ASCII.") from exc
 
     try:
         payload = json.loads(line.strip())
     except json.JSONDecodeError as exc:
-        raise ProtocolError(f"JSON invalido: {exc.msg}") from exc
+        raise ProtocolError(f"JSON inválido: {exc.msg}") from exc
 
     if not isinstance(payload, dict):
         raise ProtocolError("A raiz da mensagem deve ser um objeto JSON.")
@@ -138,7 +150,8 @@ def decode_line(line: str | bytes) -> ProtocolFrame:
     protocol = _required_int(payload, "protocol")
     if protocol != PROTOCOL_VERSION:
         raise ProtocolError(
-            f"Versao de protocolo incompatível: {protocol}, esperada {PROTOCOL_VERSION}."
+            f"Versão de protocolo incompatível: {protocol}, "
+            f"esperada {PROTOCOL_VERSION}."
         )
 
     frame_type = payload.get("type")
@@ -222,7 +235,7 @@ def encode_frame(frame: ProtocolFrame) -> str:
             "flash": bytes_to_hex(frame.flash),
         }
     else:
-        raise TypeError(f"Tipo de frame nao suportado: {type(frame)!r}")
+        raise TypeError(f"Tipo de quadro não suportado: {type(frame)!r}")
     return json.dumps(payload, separators=(",", ":")) + "\n"
 
 
@@ -254,7 +267,9 @@ def decode_eeprom_history(data: bytes) -> list[dict[str, int | str]]:
                 "a": a,
                 "b": b,
                 "operation": operation,
-                "operation_name": OPERATION_NAMES.get(operation, f"OP {operation}"),
+                "operation_name": OPERATION_NAMES.get(
+                    operation, f"Operação {operation}"
+                ),
                 "result": result,
                 "flags": flags,
             }
@@ -264,31 +279,73 @@ def decode_eeprom_history(data: bytes) -> list[dict[str, int | str]]:
 
 def sram_meaning(index: int) -> str:
     meanings = {
-        0: "ULA operand A",
-        1: "ULA operand B",
-        2: "ULA operation code",
-        3: "ULA result",
-        4: "ULA flags: D V N C Z",
-        5: "CPU status register SREG",
+        0: "Operando A da ULA",
+        1: "Operando B da ULA",
+        2: "Código da operação da ULA",
+        3: "Resultado da ULA",
+        4: "Flags da ULA: D, V, N, C e Z",
+        5: "Registrador de estado da CPU (SREG)",
         6: "PORTB",
         7: "PORTC",
         8: "PORTD",
         9: "PINB",
         10: "PINC",
         11: "PIND",
-        12: "TCNT0",
-        13: "TCNT2",
-        14: "ADC A0 low byte",
-        15: "ADC A0 high byte",
+        12: "Contador do temporizador 0 (TCNT0)",
+        13: "Contador do temporizador 2 (TCNT2)",
+        14: "Byte menos significativo do ADC A0",
+        15: "Byte mais significativo do ADC A0",
     }
     if index in meanings:
         return meanings[index]
     if 16 <= index < 128:
         slot = (index - 16) // 7
         field = (index - 16) % 7
-        field_names = ("A", "B", "operation", "result", "flags", "SREG", "sequence")
-        return f"ULA circular history slot {slot}, {field_names[field]}"
-    return "Unmapped SRAM byte"
+        field_names = (
+            "operando A",
+            "operando B",
+            "operação",
+            "resultado",
+            "flags",
+            "SREG",
+            "sequência",
+        )
+        return f"Histórico circular da ULA, registro {slot}: {field_names[field]}"
+    return "Byte da SRAM sem significado instrumentado"
+
+
+def sram_description(index: int) -> str:
+    descriptions = {
+        0: "Guarda o valor de 4 bits confirmado como primeira entrada da operação.",
+        1: "Guarda o valor de 4 bits confirmado como segunda entrada da operação.",
+        2: "Seleciona uma das oito operações da ULA, usando os três bits inferiores.",
+        3: "Contém os quatro bits de saída produzidos pela última execução da ULA.",
+        4: "Agrupa os indicadores Zero, Carry/Borrow, Negativo, Overflow e Divisão por zero.",
+        5: "É uma cópia do registrador SREG real do ATmega328P no instante da amostra.",
+        6: "Mostra os níveis escritos no registrador de saída da porta digital B.",
+        7: "Mostra os níveis escritos no registrador de saída da porta analógica C.",
+        8: "Mostra os níveis escritos no registrador de saída da porta digital D.",
+        9: "Mostra os níveis elétricos atualmente lidos nos pinos da porta B.",
+        10: "Mostra os níveis elétricos atualmente lidos nos pinos da porta C.",
+        11: "Mostra os níveis elétricos atualmente lidos nos pinos da porta D.",
+        12: "Registra o valor instantâneo do contador de 8 bits usado pelo temporizador 0.",
+        13: "Registra o valor instantâneo do contador de 8 bits do temporizador 2.",
+        14: "Parte baixa da conversão analógica de A0; deve ser combinada com o endereço 15.",
+        15: "Parte alta da conversão analógica de A0; completa o valor de 10 bits do ADC.",
+    }
+    if index in descriptions:
+        return descriptions[index]
+    if 16 <= index < 128:
+        slot = (index - 16) // 7
+        return (
+            f"Este byte pertence ao registro {slot} do histórico circular mantido "
+            "na SRAM. Cada registro preserva A, B, operação, resultado, flags, "
+            "SREG e número de sequência da execução."
+        )
+    return (
+        "Este endereço pertence à janela instrumentada, mas ainda não recebeu "
+        "um significado específico no firmware."
+    )
 
 
 def _decode_snapshot(payload: dict[str, Any]) -> SnapshotFrame:
@@ -365,7 +422,7 @@ def _bounded_int(payload: dict[str, Any], key: str, minimum: int, maximum: int) 
 def _required_str(payload: dict[str, Any], key: str) -> str:
     value = payload.get(key)
     if not isinstance(value, str) or not value:
-        raise ProtocolError(f"Campo {key!r} deve ser texto nao vazio.")
+        raise ProtocolError(f"Campo {key!r} deve ser texto não vazio.")
     return value
 
 
@@ -378,4 +435,4 @@ def _decode_hex(payload: dict[str, Any], key: str, expected_size: int) -> bytes:
     try:
         return bytes.fromhex(value)
     except ValueError as exc:
-        raise ProtocolError(f"Campo {key!r} possui hexadecimal invalido.") from exc
+        raise ProtocolError(f"Campo {key!r} possui hexadecimal inválido.") from exc

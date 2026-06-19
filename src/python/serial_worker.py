@@ -21,7 +21,7 @@ class SourceEvent:
 def list_serial_ports() -> list[tuple[str, str]]:
     ports = []
     for port in list_ports.comports():
-        description = port.description or "Serial device"
+        description = port.description or "Dispositivo serial"
         ports.append((port.device, description))
     return sorted(ports, key=lambda item: item[0].lower())
 
@@ -48,7 +48,8 @@ def choose_serial_port(port: str | None, available: list[tuple[str, str]]) -> st
 
     devices = ", ".join(device for device, _ in available)
     raise RuntimeError(
-        f"Varias portas seriais encontradas ({devices}). Selecione uma porta."
+        f"Várias portas seriais foram encontradas ({devices}). "
+        "Selecione uma porta."
     )
 
 

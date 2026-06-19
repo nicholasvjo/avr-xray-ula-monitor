@@ -61,7 +61,7 @@ class SimulatorWorker:
         )
         self._emit_frame(
             HelloFrame(
-                device="AVR X-Ray Simulator",
+                device="Simulador AVR X-Ray",
                 firmware="1.0-sim",
                 protocol=1,
                 sample_hz=self.sample_hz,
